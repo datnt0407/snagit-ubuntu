@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Snagit
+GenericName=Chụp màn hình
+Comment=Chụp màn hình, chú thích và chia sẻ nhanh
+Exec=@LAUNCHER@
+Icon=snagit
+Terminal=false
+Categories=Utility;Graphics;
+Keywords=screenshot;capture;chụp;màn hình;
+StartupNotify=false
+Actions=Capture;Settings;
+
+[Desktop Action Capture]
+Name=Chụp màn hình
+Exec=@LAUNCHER@ --capture
+
+[Desktop Action Settings]
+Name=Cài đặt
+Exec=@LAUNCHER@ --settings
