@@ -47,13 +47,19 @@ Chạy trực tiếp không cần cài: `python3 -m snagit` (trong thư mục d�
 | Công cụ | Phím |
 |---|---|
 | Chọn / di chuyển (double-click để sửa chữ) | `V` |
+| Bút vẽ tự do (nét tự làm mượt) | `P` |
 | Văn bản | `T` |
+| Callout — hộp chú thích có đuôi | `C` |
 | Đoạn thẳng | `L` |
 | Mũi tên | `A` |
 | Hình tròn / elip | `E` |
 | Hình chữ nhật | `R` |
 
 - Giữ `Shift` khi vẽ: đường thẳng bám góc 45°, hình vuông, hình tròn.
+- **Callout:** kéo để vẽ hộp (hoặc click để tạo hộp mặc định) rồi gõ chữ ngay. Hộp tự giãn rộng
+  theo chữ tới gần mép phải ảnh, sau đó chữ tự xuống dòng và hộp giãn chiều cao. Chọn callout rồi
+  kéo **tay nắm tròn** ở mũi đuôi để chỉ vào nội dung. Double-click để sửa chữ. Nền theo màu đang
+  chọn, chữ tự đổi trắng/đen cho dễ đọc.
 - Đổi màu / độ dày / phông khi đang chọn đối tượng sẽ áp dụng cho đối tượng đó.
 - `Ctrl+Z` hoàn tác, `Ctrl+Y` làm lại, `Delete` xóa đối tượng đang chọn.
 - `Ctrl+lăn chuột` thu phóng, `Ctrl+0` vừa cửa sổ, `Ctrl+1` 100%.

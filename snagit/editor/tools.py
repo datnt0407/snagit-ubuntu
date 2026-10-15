@@ -4,23 +4,30 @@ from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPixmap, QTransform, QUndoStack
 from PyQt6.QtWidgets import QGraphicsPixmapItem, QGraphicsScene
 
-from snagit.editor.commands import (AddItemCommand, EditTextCommand, MoveItemsCommand, RemoveItemsCommand,
-                                    StyleCommand)
-from snagit.editor.items import ArrowItem, EllipseItem, LineItem, RectItem, TextItem, constrain
+from snagit.editor.commands import (AddItemCommand, EditTextCommand, MoveItemsCommand, MoveTailCommand,
+                                    RemoveItemsCommand, StyleCommand)
+from snagit.editor.items import (ArrowItem, CalloutItem, EllipseItem, LineItem, PenItem, RectItem, TextItem,
+                                 constrain)
 
 TOOL_SELECT = "select"
+TOOL_PEN = "pen"
 TOOL_TEXT = "text"
+TOOL_CALLOUT = "callout"
 TOOL_LINE = "line"
 TOOL_ARROW = "arrow"
 TOOL_ELLIPSE = "ellipse"
 TOOL_RECT = "rect"
 
 SHAPE_CLASSES = {
+    TOOL_PEN: PenItem,
     TOOL_LINE: LineItem,
     TOOL_ARROW: ArrowItem,
     TOOL_ELLIPSE: EllipseItem,
     TOOL_RECT: RectItem,
 }
+
+# Công cụ hỗ trợ giữ Shift để bám góc 45° / hình vuông / hình tròn
+CONSTRAINABLE = {TOOL_LINE, TOOL_ARROW, TOOL_ELLIPSE, TOOL_RECT}
 
 
 class AnnotationScene(QGraphicsScene):
@@ -37,8 +44,11 @@ class AnnotationScene(QGraphicsScene):
         self._background.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         self.addItem(self._background)
         self.setSceneRect(QRectF(image.rect()))
+        # Các đối tượng đổi kích thước liên tục (callout, nét bút) -> không dùng chỉ mục BSP
+        self.setItemIndexMethod(QGraphicsScene.ItemIndexMethod.NoIndex)
 
         self._drawing = None
+        self._drawing_callout = None
         self._draw_start = QPointF()
         self._move_start = {}
         self._z = 0
@@ -85,7 +95,12 @@ class AnnotationScene(QGraphicsScene):
         # Đang gõ chữ mà click ra ngoài -> kết thúc ô chữ, không tạo đối tượng mới
         editing = self.editing_text_item()
         if editing is not None and not editing.sceneBoundingRect().contains(pos):
+            parent = editing.parentItem()
             self.finish_text_editing()
+            # Nhấn vào tay nắm đuôi của callout vừa gõ -> kéo đuôi luôn
+            if isinstance(parent, CalloutItem) and parent.scene() is self and parent.handle_hit(pos):
+                parent.setSelected(True)
+                super().mousePressEvent(e)
             return
         if editing is not None:
             super().mousePressEvent(e)
@@ -103,6 +118,22 @@ class AnnotationScene(QGraphicsScene):
             item.start_editing()
             return
 
+        if self.tool == TOOL_CALLOUT:
+            callout = self._item_at(pos, CalloutItem)
+            if callout is not None:
+                if callout.isSelected() and callout.handle_hit(pos):
+                    super().mousePressEvent(e)  # kéo tay nắm đuôi
+                    return
+                self.clearSelection()
+                callout.start_editing()
+                return
+            self.clearSelection()
+            self._draw_start = pos
+            self._drawing_callout = CalloutItem(pos, self.color, self.text_font, self._on_callout_text_finished)
+            self._drawing_callout.setZValue(self._next_z())
+            self.addItem(self._drawing_callout)
+            return
+
         cls = SHAPE_CLASSES.get(self.tool)
         if cls is not None:
             self.clearSelection()
@@ -112,15 +143,25 @@ class AnnotationScene(QGraphicsScene):
             self.addItem(self._drawing)
 
     def mouseMoveEvent(self, e):
+        if self._drawing_callout is not None:
+            self._drawing_callout.set_box(self._draw_start, e.scenePos())
+            return
         if self._drawing is not None:
             end = e.scenePos()
-            if e.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+            if e.modifiers() & Qt.KeyboardModifier.ShiftModifier and self.tool in CONSTRAINABLE:
                 end = constrain(self.tool, self._draw_start, end)
             self._drawing.set_points(self._draw_start, end)
             return
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e):
+        if self._drawing_callout is not None and e.button() == Qt.MouseButton.LeftButton:
+            callout, self._drawing_callout = self._drawing_callout, None
+            if callout.is_degenerate():
+                callout.use_default_size()
+            callout.setSelected(True)
+            callout.start_editing()
+            return
         if self._drawing is not None and e.button() == Qt.MouseButton.LeftButton:
             item, self._drawing = self._drawing, None
             if item.is_degenerate():
@@ -140,6 +181,10 @@ class AnnotationScene(QGraphicsScene):
             text = self._item_at(e.scenePos(), TextItem)
             if text is not None:
                 text.start_editing()
+                return
+            callout = self._item_at(e.scenePos(), CalloutItem)
+            if callout is not None:
+                callout.start_editing()
                 return
         super().mouseDoubleClickEvent(e)
 
@@ -161,6 +206,29 @@ class AnnotationScene(QGraphicsScene):
             # Xóa hết chữ -> coi như xóa đối tượng (khôi phục được bằng Undo)
             item.setPlainText(item.text_before)
             self.undo_stack.push(RemoveItemsCommand(self, [item], "Xóa văn bản"))
+
+    # ---------- Callout ----------
+    def _on_callout_text_finished(self, callout: CalloutItem):
+        text_item = callout.text
+        text = text_item.toPlainText()
+        callout.update()
+        if callout.is_new:
+            if text.strip():
+                callout.is_new = False
+                self.undo_stack.push(AddItemCommand(self, callout, "Thêm callout"))
+            else:
+                self.removeItem(callout)
+            return
+        if text == text_item.text_before:
+            return
+        if text.strip():
+            self.undo_stack.push(EditTextCommand(text_item, text_item.text_before, text))
+        else:
+            text_item.setPlainText(text_item.text_before)
+            self.undo_stack.push(RemoveItemsCommand(self, [callout], "Xóa callout"))
+
+    def on_tail_moved(self, callout: CalloutItem, old_tip: QPointF, new_tip: QPointF):
+        self.undo_stack.push(MoveTailCommand(callout, old_tip, new_tip))
 
     # ---------- Thao tác ----------
     def delete_selected(self) -> bool:

@@ -15,7 +15,9 @@ PALETTE = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#8e24aa", "#0
 
 TOOLS = [
     (T.TOOL_SELECT, "Chọn / Di chuyển", "V"),
+    (T.TOOL_PEN, "Bút vẽ tự do", "P"),
     (T.TOOL_TEXT, "Văn bản", "T"),
+    (T.TOOL_CALLOUT, "Callout (hộp chú thích có đuôi)", "C"),
     (T.TOOL_LINE, "Đoạn thẳng", "L"),
     (T.TOOL_ARROW, "Mũi tên", "A"),
     (T.TOOL_ELLIPSE, "Hình tròn / Elip", "E"),
@@ -242,7 +244,8 @@ class EditorWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.zoom_label)
         self.view.zoom_changed.connect(lambda z: self.zoom_label.setText(f"Thu phóng: {round(z * 100)}%  "))
         self.statusBar().showMessage(
-            "Giữ Shift để vẽ thẳng 45° / hình vuông / hình tròn  •  Ctrl+lăn chuột để thu phóng  •  "
+            "Giữ Shift để vẽ thẳng 45° / hình vuông / hình tròn  •  Kéo tay nắm tròn để chỉnh đuôi callout  •  "
+            "Ctrl+lăn chuột để thu phóng  •  "
             "Enter để hoàn tất, Esc để hủy")
 
     def _resize_to_image(self, image: QImage):
@@ -361,5 +364,7 @@ class EditorWindow(QMainWindow):
         if not self._handled:
             self._handled = True
             self._exporter(self.scene.render_image())
+        # Scene phát selectionChanged khi bị hủy -> ngắt trước để không gọi vào đối tượng đã xóa
+        self.scene.selectionChanged.disconnect()
         super().closeEvent(e)
 

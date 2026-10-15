@@ -35,6 +35,20 @@ def tool_icon(name: str) -> QIcon:
             path.lineTo(x, y)
         path.closeSubpath()
         p.drawPath(path)
+    elif name == "pen":
+        path = QPainterPath(QPointF(3, 17))
+        path.cubicTo(QPointF(6, 6), QPointF(10, 6), QPointF(11, 13))
+        path.cubicTo(QPointF(12, 20), QPointF(17, 19), QPointF(21, 7))
+        p.drawPath(path)
+    elif name == "callout":
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(3, 3, 18, 12), 3, 3)
+        tail = QPainterPath(QPointF(7, 14.5))
+        tail.lineTo(QPointF(5, 21))
+        tail.lineTo(QPointF(12, 14.5))
+        tail.closeSubpath()
+        path = path.united(tail)
+        p.drawPath(path)
     elif name == "text":
         font = QFont("Sans Serif")
         font.setPixelSize(18)

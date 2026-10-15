@@ -65,6 +65,18 @@ class StyleCommand(QUndoCommand):
             item.set_style(old)
 
 
+class MoveTailCommand(QUndoCommand):
+    def __init__(self, callout, old_tip, new_tip):
+        super().__init__("Di chuyển đuôi callout")
+        self._callout, self._old, self._new = callout, old_tip, new_tip
+
+    def redo(self):
+        self._callout.set_tip(self._new)
+
+    def undo(self):
+        self._callout.set_tip(self._old)
+
+
 class EditTextCommand(QUndoCommand):
     def __init__(self, item, old_text, new_text):
         super().__init__("Sửa văn bản")
